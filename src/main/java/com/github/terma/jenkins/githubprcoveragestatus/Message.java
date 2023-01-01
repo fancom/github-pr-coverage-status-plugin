@@ -79,15 +79,18 @@ class Message {
     }
 
     public String forBuild() {
-        String message =  String.format("Coverage %s changed %s vs master %s",
+        StringBuilder message = new StringBuilder(String.format("Coverage %s changed %s vs master %s",
                 Percent.toWholeNoSignString(coverage),
                 Percent.toString(Percent.change(coverage, masterCoverage)),
-                Percent.toWholeNoSignString(masterCoverage));
+                Percent.toWholeNoSignString(masterCoverage)));
 
         for (Map.Entry<String, String> entry : coverageResult.entrySet()) {
-            message += "\n" + entry.getKey() + ": -" + entry.getValue();
+            message.append("<BR/>").append(entry.getKey()).append(": -").append(entry.getValue());
         }
-        return message;
+        if (masterCoverage > coverage && coverageResult.entrySet().size() ==0){
+            message.append("<BR/>").append("Failed to get the coverage reduce reason. Check coverage reports manually");
+        }
+        return message.toString();
     }
 
     private String shieldIoUrl(String icon, final int yellowThreshold, final int greenThreshold) {

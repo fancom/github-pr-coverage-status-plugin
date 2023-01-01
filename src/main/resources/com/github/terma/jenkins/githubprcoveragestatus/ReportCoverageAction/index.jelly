@@ -1,16 +1,12 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:l="/lib/layout" xmlns:st="jelly:stapler">
-<!--    <st:bind var="action" value="${it.getAction('github-pr-coverage-status.ReportCoverageAction')}"/>-->
-<!--    <j:if test="${action != null}">-->
-<!--        <p>${action.text}</p>-->
-<!--    </j:if>-->
-    <l:layout title="Greeting">
+    <l:layout title="Coverage detail">
         <l:side-panel>
             <st:include page="sidepanel.jelly" it="${it.run}" optional="true"/>
         </l:side-panel>
         <l:main-panel>
             <p>
-                Name: ${it.text}
+                <j:out value="${app.markupFormatter.translate(it.text)}"/>
             </p>
         </l:main-panel>
     </l:layout>

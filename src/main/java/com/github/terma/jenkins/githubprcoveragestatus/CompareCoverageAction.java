@@ -55,6 +55,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.*;
 import java.io.File;
+import java.util.Objects;
 
 /**
  * Build step to publish pull request
@@ -300,8 +301,7 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
-
-    private Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException, InterruptedException {
+    private static Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log) throws IOException, InterruptedException {
         Map<String, String> coverageDetails = new HashMap<>();
         if (!dev.exists() || !test.exists()){
             log.println("Coverage file(s) does not exists. failed to run comparison");
@@ -315,86 +315,38 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             }
             return coverageDetails;
         }
-        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-
-        org.w3c.dom.Document docDev = dBuilder.parse(dev.read());
-        Document docTest = dBuilder.parse(test.read());
-
-        XPathFactory xPathfactory = XPathFactory.newInstance();
-        XPath xpath = xPathfactory.newXPath();
-
-        XPathExpression expr = xpath.compile("//packages/package/classes/class");
-        NodeList nListTest = (NodeList) expr.evaluate(docTest, XPathConstants.NODESET);
-
-
-        for (int temp = 0; temp < nListTest.getLength(); temp++) {
-            Node nNode = nListTest.item(temp);
-            if (nNode.getNodeType() == Node.ELEMENT_NODE) {
-                Element eElement = (Element) nNode;
-                String name = eElement.getAttribute("name");
-                String lineRate = eElement.getAttribute("line-rate");
-
-                XPathExpression exprDev = xpath.compile("//packages/package/classes/class[@name='" + name + "']");
-                NodeList nListDevTemp = (NodeList) exprDev.evaluate(docDev, XPathConstants.NODESET);
-                if (nListDevTemp.getLength() > 0) {
-                    Node nNodeDev = nListDevTemp.item(0);
-                    if (nNodeDev.getNodeType() == Node.ELEMENT_NODE) {
-                        Element eElementDev = (Element) nNodeDev;
-                        String lineRateDev = eElementDev.getAttribute("line-rate");
-                        if (!lineRate.equals(lineRateDev) && Float.parseFloat(lineRateDev) > Float.parseFloat(lineRate)) {
-                            coverageDetails.put(eElement.getAttribute("filename"), String.format("%.4f", (Float.parseFloat(lineRateDev) - Float.parseFloat(lineRate)) * 100) + "%");
-                            log.println(eElement.getAttribute("filename") + " coverage: -" + String.format("%.4f", (Float.parseFloat(lineRateDev) - Float.parseFloat(lineRate)) * 100) + "%");
-
-                            // Iterate over the lines of the test class
-                            NodeList linesTest = eElement.getElementsByTagName("lines");
-                            for (int i = 0; i < linesTest.getLength(); i++) {
-                                Node lineTest = linesTest.item(i);
-                                if (lineTest.getNodeType() == Node.ELEMENT_NODE) {
-                                    Element eLineTest = (Element) lineTest;
-                                    NodeList linesTestChild = eLineTest.getElementsByTagName("line");
-                                    for (int j = 0; j < linesTestChild.getLength(); j++) {
-                                        Node lineChildTest = linesTestChild.item(j);
-                                        if (lineChildTest.getNodeType() == Node.ELEMENT_NODE) {
-                                            Element eLineChildTest = (Element) lineChildTest;
-                                            String hitsTest = eLineChildTest.getAttribute("hits");
-
-                                            // Check if the hits attribute of the test line is '0'
-                                            if ("0".equals(hitsTest)) {
-                                                // Find the corresponding line in the dev class
-                                                NodeList linesDev = eElementDev.getElementsByTagName("lines");
-                                                for (int k = 0; k < linesDev.getLength(); k++) {
-                                                    Node lineDev = linesDev.item(k);
-                                                    if (lineDev.getNodeType() == Node.ELEMENT_NODE) {
-                                                        Element eLineDev = (Element) lineDev;
-                                                        NodeList linesDevChild = eLineDev.getElementsByTagName("line");
-                                                        for (int l = 0; l < linesDevChild.getLength(); l++) {
-                                                            Node lineChildDev = linesDevChild.item(l);
-                                                            if (lineChildDev.getNodeType() == Node.ELEMENT_NODE) {
-                                                                Element eLineChildDev = (Element) lineChildDev;
-                                                                String numberDev = eLineChildDev.getAttribute("number");
-                                                                String hitsDev = eLineChildDev.getAttribute("hits");
-
-                                                                // Check if the hits attribute of the dev line is not '0'
-                                                                if (!"0".equals(hitsDev) && numberDev.equals(eLineChildTest.getAttribute("number"))) {
-                                                                    log.println("Line: " + eLineChildTest.getAttribute("number"));
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+        try {
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser saxParser = factory.newSAXParser();
+            CoberturaHandler handlerDev = new CoberturaHandler();
+            CoberturaHandler handlerTest = new CoberturaHandler();
+            saxParser.parse(dev.read(), handlerDev);
+            Map<String, Coverage> coverageDev = handlerDev.getCoverageDetails();
+            saxParser.parse(test.read(), handlerTest);
+            Map<String, Coverage> coverageTest = handlerTest.getCoverageDetails();
+            for (Map.Entry<String, Coverage> entry : coverageTest.entrySet()) {
+                Coverage entryDev = coverageDev.getOrDefault(entry.getKey(),null);
+                if (entryDev != null && !Objects.equals(entryDev.lineRate, entry.getValue().lineRate) && Float.parseFloat(entryDev.lineRate) > Float.parseFloat(entry.getValue().lineRate)){
+                    coverageDetails.put(entry.getKey(), String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
+                    log.println(entry.getKey() + " coverage: -" + String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
+                    for (Map.Entry<String, String> line : entry.getValue().lines.entrySet()){
+                        if (line.getValue().equals("0")){
+                            String devLine = entryDev.lines.getOrDefault(line.getKey(), "0");
+                            if (!devLine.equals("0")){
+                                log.println("Line: " + line.getKey());
                             }
                         }
                     }
                 }
-            }
-        }
+                else if (entryDev == null && Objects.equals(entry.getValue().lineRate, "0.0")){
+                    coverageDetails.put(entry.getKey(), "0.0 %");
+                    log.println(entry.getKey() + " coverage: 0.0%");
 
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return coverageDetails;
     }
-
 }
