@@ -16,7 +16,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh label: 'Build', script: 'nvm install'
+                sh label: 'Build', script: 'mvn install'
                 archiveArtifacts artifacts: 'target/*.hpi'
             }
         }
