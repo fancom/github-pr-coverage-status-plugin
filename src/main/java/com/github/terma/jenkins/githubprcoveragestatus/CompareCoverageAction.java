@@ -201,12 +201,13 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             TaskListener listener
     ) {
         try {
-            String text = message.forStatusCheck();
+            listener.getLogger().println(BUILD_LOG_PREFIX + "Diff: "        + String.valueOf(coverage - targetCoverage));
+            listener.getLogger().println(BUILD_LOG_PREFIX + "Mark PR red? " + String.valueOf(coverage - targetCoverage <= -0.00005));
             List<GHPullRequestCommitDetail> commits = gitHubRepository.getPullRequest(prId).listCommits().asList();
             ServiceRegistry.getPullRequestRepository().createCommitStatus(
                     gitHubRepository,
                     commits.get(commits.size() - 1).getSha(),
-                    coverage < targetCoverage ? GHCommitState.FAILURE : GHCommitState.SUCCESS,
+                    coverage - targetCoverage <= -0.00005 ? GHCommitState.FAILURE : GHCommitState.SUCCESS, // fail if coverage decreased more than 0.005%
                     buildUrl,
                     message.forStatusCheck()
             );
