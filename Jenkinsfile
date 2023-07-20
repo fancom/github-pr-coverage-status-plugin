@@ -15,8 +15,14 @@ pipeline {
     }
     stages {
         stage('Build') {
+            agent {
+                docker {
+                    image "maven:3.8.7"
+                    reuseNode true
+                }
+            }
             steps {
-                sh label: 'Build', script: 'mvn install'
+                sh label: 'Build', script: 'mvn clean package'
                 archiveArtifacts artifacts: 'target/*.hpi'
             }
         }
