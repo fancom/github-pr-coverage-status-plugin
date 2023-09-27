@@ -201,13 +201,26 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             TaskListener listener
     ) {
         try {
-            listener.getLogger().println(BUILD_LOG_PREFIX + "Diff: "        + String.valueOf(coverage - targetCoverage));
-            listener.getLogger().println(BUILD_LOG_PREFIX + "Mark PR red? " + String.valueOf(coverage - targetCoverage <= -0.00005));
+            listener.getLogger().println(
+                BUILD_LOG_PREFIX +
+                "[debug] Rounded PR coverage: " +
+                String.valueOf(Percent.roundFourAfterDigit(coverage))
+            );
+            listener.getLogger().println(
+                BUILD_LOG_PREFIX +
+                "[debug] Rounded master coverage: " +
+                String.valueOf(Percent.roundFourAfterDigit(targetCoverage))
+            );
+            listener.getLogger().println(
+                BUILD_LOG_PREFIX +
+                "[debug] Mark PR as failed? " +
+                String.valueOf(Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(targetCoverage))
+            );
             List<GHPullRequestCommitDetail> commits = gitHubRepository.getPullRequest(prId).listCommits().asList();
             ServiceRegistry.getPullRequestRepository().createCommitStatus(
                     gitHubRepository,
                     commits.get(commits.size() - 1).getSha(),
-                    coverage - targetCoverage <= -0.00005 ? GHCommitState.FAILURE : GHCommitState.SUCCESS, // fail if coverage decreased more than 0.005%
+                    Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(targetCoverage) ? GHCommitState.FAILURE : GHCommitState.SUCCESS,
                     buildUrl,
                     message.forStatusCheck()
             );

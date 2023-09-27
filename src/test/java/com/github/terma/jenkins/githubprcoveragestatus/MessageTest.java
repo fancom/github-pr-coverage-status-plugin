@@ -31,6 +31,8 @@ public class MessageTest {
         Assert.assertEquals("Coverage 70% changed +20.0% vs master 50%", new Message(0.7f, 0.5f).forConsole());
         Assert.assertEquals("Coverage 0% changed +0.02% vs master 0%", new Message(0.0007f, 0.0005f).forConsole());
         Assert.assertEquals("Coverage 0% changed 0.0% vs master 0%", new Message(0.000007f, 0.000005f).forConsole());
+        Assert.assertEquals("Coverage 95% changed 0.0% vs master 95%", new Message(0.95000f, 0.94995f).forConsole());
+        Assert.assertEquals("Coverage 95% changed +0.01% vs master 95%", new Message(0.94996f, 0.94994f).forConsole());
     }
 
     @Test
@@ -44,6 +46,8 @@ public class MessageTest {
         Assert.assertEquals("60% (+0.06%) vs master 60%", new Message(0.6007f, 0.6001f).forIcon());
         Assert.assertEquals("0% (+0.01%) vs master 0%", new Message(0.00007f, 0.00001f).forIcon());
         Assert.assertEquals("0% (0.0%) vs master 0%", new Message(0.000007f, 0.000001f).forIcon());
+        Assert.assertEquals("95% (0.0%) vs master 95%", new Message(0.95000f, 0.94995f).forIcon());
+        Assert.assertEquals("95% (+0.01%) vs master 95%", new Message(0.94996f, 0.94994f).forIcon());
     }
 
     @Test

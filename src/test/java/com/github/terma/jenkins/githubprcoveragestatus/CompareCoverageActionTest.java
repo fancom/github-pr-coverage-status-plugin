@@ -148,7 +148,7 @@ public class CompareCoverageActionTest {
         prepareBuildSuccess();
         prepareEnvVars();
         prepareCommit();
-        prepareCoverageData(0.95f, 0.94994f); //-0,006%
+        prepareCoverageData(0.95000f, 0.94994f); //-0,006%
         coverageAction.setPublishResultAs("statusCheck");
 
         coverageAction.perform(build, null, null, listener);
@@ -167,7 +167,7 @@ public class CompareCoverageActionTest {
         prepareBuildSuccess();
         prepareEnvVars();
         prepareCommit();
-        prepareCoverageData(0.95f, 0.94996f); //-0,004%
+        prepareCoverageData(0.95000f, 0.94996f); //-0,004%
         coverageAction.setPublishResultAs("statusCheck");
 
         coverageAction.perform(build, null, null, listener);
