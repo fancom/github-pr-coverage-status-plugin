@@ -133,6 +133,14 @@ public class PrIdAndUrlUtilsTest {
         Assert.assertEquals("SCM_VARS_GIT_URL-SCM_VARS_GIT_BRANCH", PrIdAndUrlUtils.getGitUrl(scmVars, build, listener));
     }
 
+    @Test
+    public void getGitUrlFromScmVarsIgnoreBranchIfOtherNull() throws IOException, InterruptedException {
+        when(envVars.get(PrIdAndUrlUtils.GIT_URL_PROPERTY)).thenReturn(null);
+        when(envVars.get(PrIdAndUrlUtils.CHANGE_URL_PROPERTY)).thenReturn(null);
+
+        Assert.assertEquals("SCM_VARS_GIT_URL", PrIdAndUrlUtils.getGitUrl(scmVars, build, listener, false));
+    }
+
     @Test(expected = UnsupportedOperationException.class)
     public void shouldThrowExceptionWhenGetGitUrlIfAllNull() throws IOException, InterruptedException {
         when(envVars.get(PrIdAndUrlUtils.GIT_URL_PROPERTY)).thenReturn(null);
@@ -155,4 +163,5 @@ public class PrIdAndUrlUtilsTest {
 
         Assert.assertEquals("SCM_VARS_GIT_URL-SCM_VARS_GIT_BRANCH", PrIdAndUrlUtils.getGitUrl(scmVars, build, listener));
     }
+    
 }

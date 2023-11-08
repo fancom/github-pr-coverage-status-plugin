@@ -77,9 +77,13 @@ public class PrIdAndUrlUtils {
     }
 
     public static String getGitUrl(final Map<String, String> scmVars, final Run build, final TaskListener listener) throws IOException, InterruptedException {
+        return getGitUrl(scmVars, build, listener, true);
+    }
+
+    public static String getGitUrl(final Map<String, String> scmVars, final Run build, final TaskListener listener, boolean includeBranch) throws IOException, InterruptedException {
         if (scmVars != null && scmVars.containsKey(GIT_URL_PROPERTY)) {
             final String scmVarsUrl = scmVars.get(GIT_URL_PROPERTY);
-            if (scmVars.containsKey(GIT_BRANCH_PROPERTY)) {
+            if (includeBranch && scmVars.containsKey(GIT_BRANCH_PROPERTY)) {
                 return scmVarsUrl + "-" + scmVars.get(GIT_BRANCH_PROPERTY);
             }
             return scmVarsUrl;
