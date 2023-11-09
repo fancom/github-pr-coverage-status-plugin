@@ -32,6 +32,7 @@ public class PrIdAndUrlUtils {
      * Injected by Git plugin
      */
     public static final String GIT_URL_PROPERTY = "GIT_URL";
+    public static final String GIT_BRANCH_PROPERTY = "GIT_BRANCH";
 
     /**
      * Injected by
@@ -76,11 +77,22 @@ public class PrIdAndUrlUtils {
     }
 
     public static String getGitUrl(final Map<String, String> scmVars, final Run build, final TaskListener listener) throws IOException, InterruptedException {
+        return getGitUrl(scmVars, build, listener, true);
+    }
+
+    public static String getGitUrl(final Map<String, String> scmVars, final Run build, final TaskListener listener, boolean includeBranch) throws IOException, InterruptedException {
+        if (scmVars != null && scmVars.containsKey(GIT_URL_PROPERTY)) {
+            final String scmVarsUrl = scmVars.get(GIT_URL_PROPERTY);
+            if (includeBranch && scmVars.containsKey(GIT_BRANCH_PROPERTY)) {
+                return scmVarsUrl + "-" + scmVars.get(GIT_BRANCH_PROPERTY);
+            }
+            return scmVarsUrl;
+        }
         Map<String, String> envVars = build.getEnvironment(listener);
         final String gitUrl = envVars.get(GIT_URL_PROPERTY);
         final String changeUrl = envVars.get(CHANGE_URL_PROPERTY);
-        if (scmVars != null && scmVars.containsKey(GIT_URL_PROPERTY)) return scmVars.get(GIT_URL_PROPERTY);
-        else if (gitUrl != null) return gitUrl;
+ 
+        if (gitUrl != null) return gitUrl;
         else if (changeUrl != null) return changeUrl;
         else throw new UnsupportedOperationException("Can't find " + GIT_URL_PROPERTY
                     + " or " + CHANGE_URL_PROPERTY + " in envs: " + envVars);
