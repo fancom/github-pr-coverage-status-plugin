@@ -42,6 +42,21 @@ import java.io.PrintWriter;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.text.Document;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.File;
+
+/**
+ * Build step to publish pull request
+
 /**
  * Build step to publish pull request coverage status message to GitHub pull request.
  * <p>
@@ -65,6 +80,8 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     private Map<String, String> scmVars;
     private String jacocoCoverageCounter;
     private String publishResultAs;
+    private String testCoverage;
+    private String devCoverage;
 
     @DataBoundConstructor
     public CompareCoverageAction() {
@@ -77,6 +94,24 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     @DataBoundSetter
     public void setPublishResultAs(String publishResultAs) {
         this.publishResultAs = publishResultAs;
+    }
+
+    public String getTestCoverage() {
+        return testCoverage;
+    }
+
+    @DataBoundSetter
+    public void setTestCoverage(String testCoverage) {
+        this.testCoverage = testCoverage;
+    }
+
+    public String getDevCoverage() {
+        return devCoverage;
+    }
+
+    @DataBoundSetter
+    public void setDevCoverage(String devCoverage) {
+        this.devCoverage = devCoverage;
     }
 
     public String getSonarLogin() {
@@ -158,6 +193,66 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
         String jenkinsUrl = settingsRepository.getJenkinsUrl();
         if (jenkinsUrl == null) jenkinsUrl = Utils.getJenkinsUrlFromBuildUrl(buildUrl);
+
+        try {
+            // Load XML files
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document devDocument = builder.parse(new File(getDevCoverage()));
+            org.w3c.dom.Document testDocument = builder.parse(new File(getTestCoverage()));
+
+            Element devRoot = devDocument.getDocumentElement();
+            Element testRoot = testDocument.getDocumentElement();
+
+            NodeList testClasses = testRoot.getElementsByTagName("class");
+
+            for (int i = 0; i < testClasses.getLength(); i++) {
+                Element item = (Element) testClasses.item(i);
+                String itemName = item.getAttribute("name");
+                String lineRateTest = item.getAttribute("line-rate");
+
+                String path = "./packages/package/classes/class/" + itemName;
+                String devXPath = String.format("./packages/package/classes/class[@name='%s']", itemName);
+                Node devItem = devDocument.getDocumentElement().getElementsByTagName("class").item(0);
+
+                if (devItem != null && devItem.getNodeType() == Node.ELEMENT_NODE) {
+                    Element devElement = (Element) devItem;
+                    String lineRateDev = devElement.getAttribute("line-rate");
+
+                    if (!lineRateTest.equals(lineRateDev) && Double.parseDouble(lineRateDev) > Double.parseDouble(lineRateTest)) {
+                        System.out.println(item.getAttribute("filename") + " coverage: -" +
+                                String.valueOf(Math.round((Double.parseDouble(lineRateDev) - Double.parseDouble(lineRateTest)) * 100.0) / 100.0) + "%");
+
+                        NodeList lines = item.getElementsByTagName("lines");
+                        for (int j = 0; j < lines.getLength(); j++) {
+                            Element line = (Element) lines.item(j);
+
+                            String lineNumber = line.getAttribute("number");
+                            String hits = line.getAttribute("hits");
+
+                            NodeList devLines = devElement.getElementsByTagName("lines");
+                            Node devLine = devLines.item(0);
+
+                            if (devLine != null && devLine.getNodeType() == Node.ELEMENT_NODE) {
+                                Element devLineElement = (Element) devLine;
+                                Node specificDevLine = devLineElement.getElementsByTagName("line").item(j);
+
+                                if (specificDevLine != null && specificDevLine.getNodeType() == Node.ELEMENT_NODE) {
+                                    Element specificDevLineElement = (Element) specificDevLine;
+                                    String devHits = specificDevLineElement.getAttribute("hits");
+
+                                    if (hits.equals("0") && devHits != null && !devHits.equals("0")) {
+                                        System.out.println("Line: " + lineNumber);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         if ("comment".equalsIgnoreCase(publishResultAs)) {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as comment");
