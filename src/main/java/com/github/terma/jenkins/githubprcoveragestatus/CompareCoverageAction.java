@@ -297,12 +297,14 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
     }
 
-    private static Map<String, String> getCoverageDetails(String dev, String test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException {
+    private Map<String, String> getCoverageDetails(String dev, String test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException {
         Map<String, String> coverageDetails = new HashMap<>();
         File fileDev = new File(dev);
         File fileTest = new File(test);
         if (!fileDev.exists() || !fileTest.exists()){
             log.println("Coverage file(s) does not exists. failed to run comparison");
+            log.println("Dev coverage file path: "+ dev);
+            log.println("Test coverage file path: "+ test);
             return coverageDetails;
         }
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
@@ -334,6 +336,50 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
                         String lineRateDev = eElementDev.getAttribute("line-rate");
                         if (!lineRate.equals(lineRateDev) && Float.parseFloat(lineRateDev) > Float.parseFloat(lineRate)) {
                             coverageDetails.put(eElement.getAttribute("filename"), String.format("%.4f", (Float.parseFloat(lineRateDev) - Float.parseFloat(lineRate)) * 100) + "%");
+                            log.println(eElement.getAttribute("filename") + " coverage: -" + String.format("%.4f", (Float.parseFloat(lineRateDev) - Float.parseFloat(lineRate)) * 100) + "%");
+
+                            // Iterate over the lines of the test class
+                            NodeList linesTest = eElement.getElementsByTagName("lines");
+                            for (int i = 0; i < linesTest.getLength(); i++) {
+                                Node lineTest = linesTest.item(i);
+                                if (lineTest.getNodeType() == Node.ELEMENT_NODE) {
+                                    Element eLineTest = (Element) lineTest;
+                                    NodeList linesTestChild = eLineTest.getElementsByTagName("line");
+                                    for (int j = 0; j < linesTestChild.getLength(); j++) {
+                                        Node lineChildTest = linesTestChild.item(j);
+                                        if (lineChildTest.getNodeType() == Node.ELEMENT_NODE) {
+                                            Element eLineChildTest = (Element) lineChildTest;
+                                            String hitsTest = eLineChildTest.getAttribute("hits");
+
+                                            // Check if the hits attribute of the test line is '0'
+                                            if ("0".equals(hitsTest)) {
+                                                // Find the corresponding line in the dev class
+                                                NodeList linesDev = eElementDev.getElementsByTagName("lines");
+                                                for (int k = 0; k < linesDev.getLength(); k++) {
+                                                    Node lineDev = linesDev.item(k);
+                                                    if (lineDev.getNodeType() == Node.ELEMENT_NODE) {
+                                                        Element eLineDev = (Element) lineDev;
+                                                        NodeList linesDevChild = eLineDev.getElementsByTagName("line");
+                                                        for (int l = 0; l < linesDevChild.getLength(); l++) {
+                                                            Node lineChildDev = linesDevChild.item(l);
+                                                            if (lineChildDev.getNodeType() == Node.ELEMENT_NODE) {
+                                                                Element eLineChildDev = (Element) lineChildDev;
+                                                                String numberDev = eLineChildDev.getAttribute("number");
+                                                                String hitsDev = eLineChildDev.getAttribute("hits");
+
+                                                                // Check if the hits attribute of the dev line is not '0'
+                                                                if (!"0".equals(hitsDev) && numberDev.equals(eLineChildTest.getAttribute("number"))) {
+                                                                    log.println("Line: " + eLineChildTest.getAttribute("number"));
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
