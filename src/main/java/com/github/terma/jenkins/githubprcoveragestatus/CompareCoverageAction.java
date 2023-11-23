@@ -39,19 +39,21 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.swing.text.Document;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.*;
 
+import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.*;
 import java.io.File;
 
 /**
@@ -186,74 +188,23 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
                 jacocoCoverageCounter).get(workspace);
         buildLog.println(BUILD_LOG_PREFIX + "build coverage: " + coverage);
 
-        final Message message = new Message(coverage, masterCoverage);
-        buildLog.println(BUILD_LOG_PREFIX + message.forConsole());
+
+
 
         final String buildUrl = Utils.getBuildUrl(build, listener);
 
         String jenkinsUrl = settingsRepository.getJenkinsUrl();
         if (jenkinsUrl == null) jenkinsUrl = Utils.getJenkinsUrlFromBuildUrl(buildUrl);
-
-        try {
-            // Load XML files
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            org.w3c.dom.Document devDocument = builder.parse(new File(getDevCoverage()));
-            org.w3c.dom.Document testDocument = builder.parse(new File(getTestCoverage()));
-
-            Element devRoot = devDocument.getDocumentElement();
-            Element testRoot = testDocument.getDocumentElement();
-
-            NodeList testClasses = testRoot.getElementsByTagName("class");
-
-            for (int i = 0; i < testClasses.getLength(); i++) {
-                Element item = (Element) testClasses.item(i);
-                String itemName = item.getAttribute("name");
-                String lineRateTest = item.getAttribute("line-rate");
-
-                String path = "./packages/package/classes/class/" + itemName;
-                String devXPath = String.format("./packages/package/classes/class[@name='%s']", itemName);
-                Node devItem = devDocument.getDocumentElement().getElementsByTagName("class").item(0);
-
-                if (devItem != null && devItem.getNodeType() == Node.ELEMENT_NODE) {
-                    Element devElement = (Element) devItem;
-                    String lineRateDev = devElement.getAttribute("line-rate");
-
-                    if (!lineRateTest.equals(lineRateDev) && Double.parseDouble(lineRateDev) > Double.parseDouble(lineRateTest)) {
-                        System.out.println(item.getAttribute("filename") + " coverage: -" +
-                                String.valueOf(Math.round((Double.parseDouble(lineRateDev) - Double.parseDouble(lineRateTest)) * 100.0) / 100.0) + "%");
-
-                        NodeList lines = item.getElementsByTagName("lines");
-                        for (int j = 0; j < lines.getLength(); j++) {
-                            Element line = (Element) lines.item(j);
-
-                            String lineNumber = line.getAttribute("number");
-                            String hits = line.getAttribute("hits");
-
-                            NodeList devLines = devElement.getElementsByTagName("lines");
-                            Node devLine = devLines.item(0);
-
-                            if (devLine != null && devLine.getNodeType() == Node.ELEMENT_NODE) {
-                                Element devLineElement = (Element) devLine;
-                                Node specificDevLine = devLineElement.getElementsByTagName("line").item(j);
-
-                                if (specificDevLine != null && specificDevLine.getNodeType() == Node.ELEMENT_NODE) {
-                                    Element specificDevLineElement = (Element) specificDevLine;
-                                    String devHits = specificDevLineElement.getAttribute("hits");
-
-                                    if (hits.equals("0") && devHits != null && !devHits.equals("0")) {
-                                        System.out.println("Line: " + lineNumber);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        Map<String, String> coverageResult = new HashMap<>();
+        if (Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(masterCoverage)) {
+            try {
+                coverageResult = getCoverageDetails(getDevCoverage(), getTestCoverage(), buildLog);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-
+        final Message message = new Message(coverage, masterCoverage, coverageResult);
+        buildLog.println(BUILD_LOG_PREFIX + message.forConsole());
         if ("comment".equalsIgnoreCase(publishResultAs)) {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as comment");
             publishComment(message, buildUrl, jenkinsUrl, settingsRepository, gitHubRepository, prId, listener);
@@ -344,6 +295,52 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             return true;
         }
 
+    }
+
+    private static Map<String, String> getCoverageDetails(String dev, String test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException {
+        Map<String, String> coverageDetails = new HashMap<>();
+        File fileDev = new File(dev);
+        File fileTest = new File(test);
+        if (!fileDev.exists() || !fileTest.exists()){
+            log.println("Coverage file(s) does not exists. failed to run comparison");
+            return coverageDetails;
+        }
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+
+        org.w3c.dom.Document docDev = dBuilder.parse(fileDev);
+        Document docTest = dBuilder.parse(fileTest);
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        XPathExpression expr = xpath.compile("//packages/package/classes/class");
+        NodeList nListTest = (NodeList) expr.evaluate(docTest, XPathConstants.NODESET);
+
+
+        for (int temp = 0; temp < nListTest.getLength(); temp++) {
+            Node nNode = nListTest.item(temp);
+            if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element eElement = (Element) nNode;
+                String name = eElement.getAttribute("name");
+                String lineRate = eElement.getAttribute("line-rate");
+
+                XPathExpression exprDev = xpath.compile("//packages/package/classes/class[@name='" + name + "']");
+                NodeList nListDevTemp = (NodeList) exprDev.evaluate(docDev, XPathConstants.NODESET);
+                if (nListDevTemp.getLength() > 0) {
+                    Node nNodeDev = nListDevTemp.item(0);
+                    if (nNodeDev.getNodeType() == Node.ELEMENT_NODE) {
+                        Element eElementDev = (Element) nNodeDev;
+                        String lineRateDev = eElementDev.getAttribute("line-rate");
+                        if (!lineRate.equals(lineRateDev) && Float.parseFloat(lineRateDev) > Float.parseFloat(lineRate)) {
+                            coverageDetails.put(eElement.getAttribute("filename"), String.format("%.4f", (Float.parseFloat(lineRateDev) - Float.parseFloat(lineRate)) * 100) + "%");
+                        }
+                    }
+                }
+            }
+        }
+
+        return coverageDetails;
     }
 
 }
