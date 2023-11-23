@@ -79,7 +79,9 @@ class Message {
         for (Map.Entry<String, String> entry : coverageResult.entrySet()) {
             message += "\n" + entry.getKey() + ": -" + entry.getValue();
         }
-
+        if (message.length()>139){
+            return message.substring(0,136)+"...";
+        }
         return message;
     }
 

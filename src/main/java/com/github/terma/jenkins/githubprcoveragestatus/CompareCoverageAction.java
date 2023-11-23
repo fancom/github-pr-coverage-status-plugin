@@ -198,7 +198,9 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         Map<String, String> coverageResult = new HashMap<>();
         if (Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(masterCoverage)) {
             try {
-                coverageResult = getCoverageDetails(getDevCoverage(), getTestCoverage(), buildLog);
+                FilePath dev = workspace.child(getDevCoverage());
+                FilePath test = workspace.child(getTestCoverage());
+                coverageResult = getCoverageDetails(dev, test, buildLog);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -297,21 +299,25 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
     }
 
-    private Map<String, String> getCoverageDetails(String dev, String test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException {
+    private Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException, InterruptedException {
         Map<String, String> coverageDetails = new HashMap<>();
-        File fileDev = new File(dev);
-        File fileTest = new File(test);
-        if (!fileDev.exists() || !fileTest.exists()){
+        if (!dev.exists() || !test.exists()){
             log.println("Coverage file(s) does not exists. failed to run comparison");
             log.println("Dev coverage file path: "+ dev);
             log.println("Test coverage file path: "+ test);
+            if (dev.exists()){
+                log.println("dev file exists");
+            }
+            if (test.exists()){
+                log.println("test file exists");
+            }
             return coverageDetails;
         }
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 
-        org.w3c.dom.Document docDev = dBuilder.parse(fileDev);
-        Document docTest = dBuilder.parse(fileTest);
+        org.w3c.dom.Document docDev = dBuilder.parse(dev.read());
+        Document docTest = dBuilder.parse(test.read());
 
         XPathFactory xPathfactory = XPathFactory.newInstance();
         XPath xpath = xPathfactory.newXPath();
