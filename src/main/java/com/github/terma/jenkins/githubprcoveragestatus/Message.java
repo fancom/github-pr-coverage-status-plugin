@@ -71,6 +71,14 @@ class Message {
     }
 
     public String forStatusCheck() {
+        return  String.format("Coverage %s changed %s vs master %s",
+                Percent.toWholeNoSignString(coverage),
+                Percent.toString(Percent.change(coverage, masterCoverage)),
+                Percent.toWholeNoSignString(masterCoverage));
+
+    }
+
+    public String forBuild() {
         String message =  String.format("Coverage %s changed %s vs master %s",
                 Percent.toWholeNoSignString(coverage),
                 Percent.toString(Percent.change(coverage, masterCoverage)),
@@ -78,9 +86,6 @@ class Message {
 
         for (Map.Entry<String, String> entry : coverageResult.entrySet()) {
             message += "\n" + entry.getKey() + ": -" + entry.getValue();
-        }
-        if (message.length()>139){
-            return message.substring(0,136)+"...";
         }
         return message;
     }

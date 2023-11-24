@@ -206,7 +206,9 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             }
         }
         final Message message = new Message(coverage, masterCoverage, coverageResult);
-        buildLog.println(BUILD_LOG_PREFIX + message.forConsole());
+        buildLog.println(BUILD_LOG_PREFIX + message.forBuild());
+        ReportCoverageAction coverageAction = new ReportCoverageAction(message.forBuild());
+        build.addAction(coverageAction);
         if ("comment".equalsIgnoreCase(publishResultAs)) {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as comment");
             publishComment(message, buildUrl, jenkinsUrl, settingsRepository, gitHubRepository, prId, listener);
