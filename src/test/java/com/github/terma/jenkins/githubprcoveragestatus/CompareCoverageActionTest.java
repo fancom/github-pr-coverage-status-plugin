@@ -84,7 +84,7 @@ public class CompareCoverageActionTest {
 
         coverageAction.perform(build, null, null, listener);
 
-        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](aaa/coverage-status-icon/?coverage=0.0&masterCoverage=0.0)](aaa/job/a)");
+        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](aaa/coverage-status-icon/?coverage=0.0&masterCoverage=0.0)](aaa/job/a/coverage-details)");
     }
 
     @Test
@@ -100,7 +100,7 @@ public class CompareCoverageActionTest {
                 ghRepository,
                 "fh3k2l",
                 GHCommitState.SUCCESS,
-                "aaa/job/a",
+                "aaa/job/a/coverage-details",
                 "Coverage 0% changed 0.0% vs master 0%"
         );
     }
@@ -119,7 +119,7 @@ public class CompareCoverageActionTest {
                 ghRepository,
                 "fh3k2l",
                 GHCommitState.SUCCESS,
-                "aaa/job/a",
+                "aaa/job/a/coverage-details",
                 "Coverage 95% changed +7.0% vs master 88%"
         );
     }
@@ -138,7 +138,7 @@ public class CompareCoverageActionTest {
                 ghRepository,
                 "fh3k2l",
                 GHCommitState.FAILURE,
-                "aaa/job/a",
+                "aaa/job/a/coverage-details",
                 "Coverage 90% changed -5.0% vs master 95%"
         );
     }
@@ -157,7 +157,7 @@ public class CompareCoverageActionTest {
                 ghRepository,
                 "fh3k2l",
                 GHCommitState.FAILURE,
-                "aaa/job/a",
+                "aaa/job/a/coverage-details",
                 "Coverage 95% changed -0.01% vs master 95%"
         );
     }
@@ -176,7 +176,7 @@ public class CompareCoverageActionTest {
                 ghRepository,
                 "fh3k2l",
                 GHCommitState.SUCCESS,
-                "aaa/job/a",
+                "aaa/job/a/coverage-details",
                 "Coverage 95% changed 0.0% vs master 95%"
         );
     }
@@ -206,7 +206,7 @@ public class CompareCoverageActionTest {
 
         coverageAction.perform(build, null, null, listener);
 
-        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](https://img.shields.io/badge/coverage-0%25%20(0.0%25)%20vs%20master%200%25-brightgreen.svg)](aaa/job/a)");
+        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](https://img.shields.io/badge/coverage-0%25%20(0.0%25)%20vs%20master%200%25-brightgreen.svg)](aaa/job/a/coverage-details)");
     }
 
     @Test
@@ -218,7 +218,7 @@ public class CompareCoverageActionTest {
 
         coverageAction.perform(build, null, null, listener);
 
-        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](customJ/coverage-status-icon/?coverage=0.0&masterCoverage=0.0)](aaa/job/a)");
+        verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](customJ/coverage-status-icon/?coverage=0.0&masterCoverage=0.0)](aaa/job/a/coverage-details)");
     }
     
     private void prepareCoverageData(float masterCoverage, float prCoverage) throws IOException, InterruptedException {

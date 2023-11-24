@@ -191,10 +191,6 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
 
 
-        final String buildUrl = Utils.getBuildUrl(build, listener);
-
-        String jenkinsUrl = settingsRepository.getJenkinsUrl();
-        if (jenkinsUrl == null) jenkinsUrl = Utils.getJenkinsUrlFromBuildUrl(buildUrl);
         Map<String, String> coverageResult = new HashMap<>();
         if (Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(masterCoverage)) {
             try {
@@ -209,6 +205,10 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         buildLog.println(BUILD_LOG_PREFIX + message.forBuild());
         ReportCoverageAction coverageAction = new ReportCoverageAction(message.forBuild());
         build.addAction(coverageAction);
+        final String buildUrl = Utils.getBuildUrl(build, listener)+"/"+coverageAction.getUrlName();
+
+        String jenkinsUrl = settingsRepository.getJenkinsUrl();
+        if (jenkinsUrl == null) jenkinsUrl = Utils.getJenkinsUrlFromBuildUrl(buildUrl);
         if ("comment".equalsIgnoreCase(publishResultAs)) {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as comment");
             publishComment(message, buildUrl, jenkinsUrl, settingsRepository, gitHubRepository, prId, listener);
