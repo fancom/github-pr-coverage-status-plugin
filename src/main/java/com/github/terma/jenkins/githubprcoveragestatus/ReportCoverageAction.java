@@ -15,12 +15,12 @@ public class ReportCoverageAction implements Action {
 
     @Override
     public String getDisplayName() {
-        return "Custom Build Action";
+        return "Coverage comparison";
     }
 
     @Override
     public String getIconFileName() {
-        return "/path/to/icon.png";
+        return "document.png";
     }
 
     @Override

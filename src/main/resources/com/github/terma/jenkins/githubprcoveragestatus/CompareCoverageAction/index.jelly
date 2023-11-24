@@ -1,0 +1,7 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler">
+        <st:bind var="action" value="${it.getAction('github-pr-coverage-status.ReportCoverageAction')}"/>
+        <j:if test="${action != null}">
+            <p>${action.text}</p>
+        </j:if>
+</j:jelly>
