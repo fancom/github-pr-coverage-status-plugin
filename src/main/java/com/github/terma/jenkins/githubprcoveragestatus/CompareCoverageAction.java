@@ -39,8 +39,26 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.xml.parsers.*;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.*;
+import java.io.File;
+import java.util.Objects;
+
+/**
+ * Build step to publish pull request
 
 /**
  * Build step to publish pull request coverage status message to GitHub pull request.
@@ -65,6 +83,8 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     private Map<String, String> scmVars;
     private String jacocoCoverageCounter;
     private String publishResultAs;
+    private String testCoverage;
+    private String devCoverage;
 
     @DataBoundConstructor
     public CompareCoverageAction() {
@@ -77,6 +97,24 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     @DataBoundSetter
     public void setPublishResultAs(String publishResultAs) {
         this.publishResultAs = publishResultAs;
+    }
+
+    public String getTestCoverage() {
+        return testCoverage;
+    }
+
+    @DataBoundSetter
+    public void setTestCoverage(String testCoverage) {
+        this.testCoverage = testCoverage;
+    }
+
+    public String getDevCoverage() {
+        return devCoverage;
+    }
+
+    @DataBoundSetter
+    public void setDevCoverage(String devCoverage) {
+        this.devCoverage = devCoverage;
     }
 
     public String getSonarLogin() {
@@ -151,14 +189,27 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
                 jacocoCoverageCounter).get(workspace);
         buildLog.println(BUILD_LOG_PREFIX + "build coverage: " + coverage);
 
-        final Message message = new Message(coverage, masterCoverage);
-        buildLog.println(BUILD_LOG_PREFIX + message.forConsole());
 
-        final String buildUrl = Utils.getBuildUrl(build, listener);
+
+
+        Map<String, String> coverageResult = new HashMap<>();
+        if (Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(masterCoverage)) {
+            try {
+                FilePath dev = workspace.child(getDevCoverage());
+                FilePath test = workspace.child(getTestCoverage());
+                coverageResult = getCoverageDetails(dev, test, buildLog);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        final Message message = new Message(coverage, masterCoverage, coverageResult);
+        buildLog.println(BUILD_LOG_PREFIX + message.forBuild());
+        ReportCoverageAction coverageAction = new ReportCoverageAction(message.forBuild());
+        build.addAction(coverageAction);
+        final String buildUrl = Utils.getBuildUrl(build, listener)+"/"+coverageAction.getUrlName();
 
         String jenkinsUrl = settingsRepository.getJenkinsUrl();
         if (jenkinsUrl == null) jenkinsUrl = Utils.getJenkinsUrlFromBuildUrl(buildUrl);
-
         if ("comment".equalsIgnoreCase(publishResultAs)) {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as comment");
             publishComment(message, buildUrl, jenkinsUrl, settingsRepository, gitHubRepository, prId, listener);
@@ -250,5 +301,52 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
+    private static Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log) throws IOException, InterruptedException {
+        Map<String, String> coverageDetails = new HashMap<>();
+        if (!dev.exists() || !test.exists()){
+            log.println("Coverage file(s) does not exists. failed to run comparison");
+            log.println("Dev coverage file path: "+ dev);
+            log.println("Test coverage file path: "+ test);
+            if (dev.exists()){
+                log.println("dev file exists");
+            }
+            if (test.exists()){
+                log.println("test file exists");
+            }
+            return coverageDetails;
+        }
+        try {
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser saxParser = factory.newSAXParser();
+            CoberturaHandler handlerDev = new CoberturaHandler();
+            CoberturaHandler handlerTest = new CoberturaHandler();
+            saxParser.parse(dev.read(), handlerDev);
+            Map<String, Coverage> coverageDev = handlerDev.getCoverageDetails();
+            saxParser.parse(test.read(), handlerTest);
+            Map<String, Coverage> coverageTest = handlerTest.getCoverageDetails();
+            for (Map.Entry<String, Coverage> entry : coverageTest.entrySet()) {
+                Coverage entryDev = coverageDev.getOrDefault(entry.getKey(),null);
+                if (entryDev != null && !Objects.equals(entryDev.lineRate, entry.getValue().lineRate) && Float.parseFloat(entryDev.lineRate) > Float.parseFloat(entry.getValue().lineRate)){
+                    coverageDetails.put(entry.getKey(), String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
+                    log.println(entry.getKey() + " coverage: -" + String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
+                    for (Map.Entry<String, String> line : entry.getValue().lines.entrySet()){
+                        if (line.getValue().equals("0")){
+                            String devLine = entryDev.lines.getOrDefault(line.getKey(), "0");
+                            if (!devLine.equals("0")){
+                                log.println("Line: " + line.getKey());
+                            }
+                        }
+                    }
+                }
+                else if (entryDev == null && Objects.equals(entry.getValue().lineRate, "0.0")){
+                    coverageDetails.put(entry.getKey(), "0.0 %");
+                    log.println(entry.getKey() + " coverage: 0.0%");
 
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return coverageDetails;
+    }
 }

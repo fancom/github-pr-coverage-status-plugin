@@ -20,6 +20,9 @@ package com.github.terma.jenkins.githubprcoveragestatus;
 import org.apache.commons.httpclient.URIException;
 import org.apache.commons.httpclient.util.URIUtil;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @SuppressWarnings("WeakerAccess")
 class Message {
 
@@ -32,10 +35,17 @@ class Message {
 
     private final float coverage;
     private final float masterCoverage;
+    private Map<String, String> coverageResult;
 
+    public Message(float coverage, float masterCoverage, Map<String, String> coverageResult) {
+        this.coverage = Percent.roundFourAfterDigit(coverage);
+        this.masterCoverage = Percent.roundFourAfterDigit(masterCoverage);
+        this.coverageResult = coverageResult;
+    }
     public Message(float coverage, float masterCoverage) {
         this.coverage = Percent.roundFourAfterDigit(coverage);
         this.masterCoverage = Percent.roundFourAfterDigit(masterCoverage);
+        this.coverageResult = new HashMap<>();
     }
 
     public String forConsole() {
@@ -61,10 +71,26 @@ class Message {
     }
 
     public String forStatusCheck() {
-        return String.format("Coverage %s changed %s vs master %s",
+        return  String.format("Coverage %s changed %s vs master %s",
                 Percent.toWholeNoSignString(coverage),
                 Percent.toString(Percent.change(coverage, masterCoverage)),
                 Percent.toWholeNoSignString(masterCoverage));
+
+    }
+
+    public String forBuild() {
+        StringBuilder message = new StringBuilder(String.format("Coverage %s changed %s vs master %s",
+                Percent.toWholeNoSignString(coverage),
+                Percent.toString(Percent.change(coverage, masterCoverage)),
+                Percent.toWholeNoSignString(masterCoverage)));
+
+        for (Map.Entry<String, String> entry : coverageResult.entrySet()) {
+            message.append("<BR/>").append(entry.getKey()).append(": -").append(entry.getValue());
+        }
+        if (masterCoverage > coverage && coverageResult.entrySet().size() ==0){
+            message.append("<BR/>").append("Failed to get the coverage reduce reason. Check coverage reports manually");
+        }
+        return message.toString();
     }
 
     private String shieldIoUrl(String icon, final int yellowThreshold, final int greenThreshold) {
