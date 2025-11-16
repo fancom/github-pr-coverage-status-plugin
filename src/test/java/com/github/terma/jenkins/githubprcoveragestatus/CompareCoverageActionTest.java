@@ -22,7 +22,9 @@ import hudson.model.Build;
 import hudson.model.Result;
 import hudson.model.TaskListener;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.jvnet.hudson.test.JenkinsRule;
 import org.kohsuke.github.*;
 
 import java.io.IOException;
@@ -86,6 +88,9 @@ public class CompareCoverageActionTest {
 
         verify(pullRequestRepository).comment(ghRepository, 12, "[![0% (0.0%) vs master 0%](aaa/coverage-status-icon/?coverage=0.0&masterCoverage=0.0)](aaa/job/a/coverage-details)");
     }
+
+    @Rule
+    public JenkinsRule jenkins = new JenkinsRule();
 
     @Test
     public void postResultAsStatusCheck() throws IOException, InterruptedException {

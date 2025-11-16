@@ -39,9 +39,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.xml.parsers.*;
 
@@ -55,7 +53,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.*;
 import java.io.File;
-import java.util.Objects;
 
 /**
  * Build step to publish pull request
@@ -85,6 +82,7 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     private String publishResultAs;
     private String testCoverage;
     private String devCoverage;
+    private List<String> changedFiles = new ArrayList<>();
 
     @DataBoundConstructor
     public CompareCoverageAction() {
@@ -153,7 +151,14 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
     public void setJacocoCoverageCounter(String jacocoCoverageCounter) {
         this.jacocoCoverageCounter = jacocoCoverageCounter;
     }
+    public List<String> getChangedFiles() {
+        return changedFiles;
+    }
 
+    @DataBoundSetter
+    public void setChangedFiles(List<String> changedFiles) {
+        this.changedFiles = changedFiles;
+    }
     // todo show message that addition comment in progress as it could take a while
     @SuppressWarnings("NullableProblems")
     @Override
@@ -169,7 +174,13 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             buildLog.println(BUILD_LOG_PREFIX + "skip, build is red");
             return;
         }
+        if (changedFiles != null && !changedFiles.isEmpty()) {
 
+            buildLog.println("Changed files: " + changedFiles);
+
+        } else {
+            buildLog.println("no changed files provided");
+        }
         buildLog.println(BUILD_LOG_PREFIX + "start");
 
         final SettingsRepository settingsRepository = ServiceRegistry.getSettingsRepository();
@@ -190,6 +201,7 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         buildLog.println(BUILD_LOG_PREFIX + "build coverage: " + coverage);
 
 
+        List<String> excludeFiles = CompareCoverageConfiguration.get().getExcludeFiles();
 
 
         Map<String, String> coverageResult = new HashMap<>();
@@ -197,11 +209,12 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             try {
                 FilePath dev = workspace.child(getDevCoverage());
                 FilePath test = workspace.child(getTestCoverage());
-                coverageResult = getCoverageDetails(dev, test, buildLog);
+                coverageResult = getCoverageDetails(dev, test, buildLog, excludeFiles);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+        //TODO: overwrite coverage, masterCoverage
         final Message message = new Message(coverage, masterCoverage, coverageResult);
         buildLog.println(BUILD_LOG_PREFIX + message.forBuild());
         ReportCoverageAction coverageAction = new ReportCoverageAction(message.forBuild());
@@ -301,7 +314,7 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
-    private static Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log) throws IOException, InterruptedException {
+    private static Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log, List<String> excludeFiles) throws IOException, InterruptedException {
         Map<String, String> coverageDetails = new HashMap<>();
         if (!dev.exists() || !test.exists()){
             log.println("Coverage file(s) does not exists. failed to run comparison");
@@ -317,7 +330,10 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
         try {
             SAXParserFactory factory = SAXParserFactory.newInstance();
+            factory.setValidating(false);
+            factory.setNamespaceAware(true);
             SAXParser saxParser = factory.newSAXParser();
+            saxParser.getXMLReader().setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             CoberturaHandler handlerDev = new CoberturaHandler();
             CoberturaHandler handlerTest = new CoberturaHandler();
             saxParser.parse(dev.read(), handlerDev);

@@ -19,10 +19,14 @@ package com.github.terma.jenkins.githubprcoveragestatus;
 
 import org.apache.commons.io.FileUtils;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * <a href="http://cobertura.sourceforge.net/xml/coverage-04.dtd">Coverage DTD</a>
@@ -65,5 +69,26 @@ class CoberturaParser implements CoverageReportParser {
         }
     }
 
+    public Map<String, Coverage> getFull(String coberturaFilePath, List<String> exclude){
+        try {
+            InputStream stream = Files.newInputStream(Paths.get(coberturaFilePath));
+            Map<String, Coverage> coverage = CoberturaHandler.parse(stream);
+            return coverage.entrySet()
+                    .stream()
+                    .filter(e -> !isExcluded(e.getValue().file, exclude))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            Map.Entry::getValue
+                    ));
+        }
+        catch (Exception ex){
+            throw new RuntimeException(ex);
+        }
+
+    }
+
+    private boolean isExcluded(String file, List<String> exclude) {
+        return exclude.stream().anyMatch(file::endsWith);
+    }
 
 }
