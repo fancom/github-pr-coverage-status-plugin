@@ -194,12 +194,11 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         final GHRepository gitHubRepository = ServiceRegistry.getPullRequestRepository().getGitHubRepository(PrIdAndUrlUtils.getGitUrl(scmVars, build, listener, false));
         float masterCoverageValue = 0;
         float testCoverageValue = 0;
-        Map<String, String> coverageResult = new HashMap<>();
+        Map<String, Coverage> coverageResult = new HashMap<>();
         if (workspace == null){
                 masterCoverageValue = masterCoverageRepository.get(gitUrl);
                 testCoverageValue = ServiceRegistry.getCoverageRepository(settingsRepository.isDisableSimpleCov(),
                 jacocoCoverageCounter).get(null);
-            ;
         } else {
             try {
                 FilePath dev = workspace.child(getDevCoverage());
@@ -349,26 +348,33 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
-    private static Map<String, String> getCoverageDetails(Map<String,Coverage> coverageDevOrig, Map<String,Coverage> coverageTestOrig, List<String> filters, PrintStream log) {
+    private static Map<String, Coverage> getCoverageDetails(Map<String,Coverage> coverageDevOrig, Map<String,Coverage> coverageTestOrig, List<String> filters, PrintStream log) {
         Map<String,Coverage> coverageDev = CoberturaHandler.filter(coverageDevOrig, filters);
         Map<String,Coverage> coverageTest = CoberturaHandler.filter(coverageTestOrig, filters);
-        Map<String, String> coverageDetails = new HashMap<>();
+        Map<String, Coverage> coverageDetails = new HashMap<>();
             for (Map.Entry<String, Coverage> entry : coverageTest.entrySet()) {
                 Coverage entryDev = coverageDev.getOrDefault(entry.getKey(),null);
                 if (entryDev != null && !Objects.equals(entryDev.lineRate, entry.getValue().lineRate) && Float.parseFloat(entryDev.lineRate) > Float.parseFloat(entry.getValue().lineRate)){
-                    coverageDetails.put(entry.getKey(), String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
+                    Coverage coverage = new Coverage();
+                    coverage.lineRate = String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%";
+                    coverage.file = entry.getKey();
                     log.println(entry.getKey() + " coverage: -" + String.format("%.4f", (Float.parseFloat(entryDev.lineRate) - Float.parseFloat(entry.getValue().lineRate)) * 100) + "%");
                     for (Map.Entry<String, String> line : entry.getValue().lines.entrySet()){
                         if (line.getValue().equals("0")){
                             String devLine = entryDev.lines.getOrDefault(line.getKey(), "0");
                             if (!devLine.equals("0")){
                                 log.println("Line: " + line.getKey());
+                                coverage.lines.put(line.getKey(), "0");
                             }
                         }
                     }
+                    coverageDetails.put(entry.getKey(), coverage);
                 }
                 else if (entryDev == null && Objects.equals(entry.getValue().lineRate, "0.0")){
-                    coverageDetails.put(entry.getKey(), "0.0 %");
+                    Coverage coverage = new Coverage();
+                    coverage.file = entry.getKey();
+                    coverage.lineRate = "0.0 %";
+                    coverageDetails.put(entry.getKey(), coverage);
                     log.println(entry.getKey() + " coverage: 0.0%");
 
                 }
