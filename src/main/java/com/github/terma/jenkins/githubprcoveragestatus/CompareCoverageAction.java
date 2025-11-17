@@ -192,30 +192,56 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         MasterCoverageRepository masterCoverageRepository = ServiceRegistry
                 .getMasterCoverageRepository(buildLog, sonarLogin, sonarPassword);
         final GHRepository gitHubRepository = ServiceRegistry.getPullRequestRepository().getGitHubRepository(PrIdAndUrlUtils.getGitUrl(scmVars, build, listener, false));
-        final float masterCoverage = masterCoverageRepository.get(gitUrl);
-        buildLog.println(BUILD_LOG_PREFIX + "master coverage: " + masterCoverage);
-
-        buildLog.println(BUILD_LOG_PREFIX + "collecting coverage...");
-        final float coverage = ServiceRegistry.getCoverageRepository(settingsRepository.isDisableSimpleCov(),
-                jacocoCoverageCounter).get(workspace);
-        buildLog.println(BUILD_LOG_PREFIX + "build coverage: " + coverage);
-
-
-        List<String> excludeFiles = CompareCoverageConfiguration.get().getExcludeFiles();
-
-
+        float masterCoverageValue = 0;
+        float testCoverageValue = 0;
         Map<String, String> coverageResult = new HashMap<>();
-        if (Percent.roundFourAfterDigit(coverage) < Percent.roundFourAfterDigit(masterCoverage)) {
+        if (workspace == null){
+                masterCoverageValue = masterCoverageRepository.get(gitUrl);
+                testCoverageValue = ServiceRegistry.getCoverageRepository(settingsRepository.isDisableSimpleCov(),
+                jacocoCoverageCounter).get(null);
+            ;
+        } else {
             try {
                 FilePath dev = workspace.child(getDevCoverage());
                 FilePath test = workspace.child(getTestCoverage());
-                coverageResult = getCoverageDetails(dev, test, buildLog, excludeFiles);
-            } catch (Exception e) {
+                List<String> filters = getCoverageFilters(changedFiles);
+                // Get coverage published on master branch (the value set on master CI build)
+                final float masterCoverageFull = masterCoverageRepository.get(gitUrl);
+
+                Map<String, Coverage> masterCoverageOrig = CoberturaHandler.parse(dev);
+                Map<String, Coverage> masterCoverage = CoberturaHandler.filter(masterCoverageOrig, filters);
+
+                buildLog.println(BUILD_LOG_PREFIX + "collecting coverage...");
+                Map<String, Coverage> coverageOrig = CoberturaHandler.parse(test);
+                Map<String, Coverage> coverage = CoberturaHandler.filter(coverageOrig, filters);
+
+
+
+                masterCoverageValue = masterCoverageFull;
+                // testCoverageValue calculation
+                // calculate delta = prCovered/prTotalAll - masterCovered/masterCoveredTotalAll
+                // calculate testCoverageValue = masterCoverageValue + delta
+
+                float coverageDelta = CoberturaHandler.coverageDelta(coverageOrig, coverage, masterCoverageOrig, masterCoverage, buildLog);
+                testCoverageValue = masterCoverageValue + coverageDelta;
+                buildLog.println("Master coverage: " + masterCoverageValue);
+                buildLog.println("PR coverage: " + testCoverageValue);
+                buildLog.println("PR coverage delta : " + coverageDelta);
+
+                if (Percent.roundFourAfterDigit(testCoverageValue) < Percent.roundFourAfterDigit(masterCoverageValue)) {
+                    try {
+                        coverageResult = getCoverageDetails(masterCoverage, coverage, buildLog);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            catch (Exception e) {
                 e.printStackTrace();
             }
         }
         //TODO: overwrite coverage, masterCoverage
-        final Message message = new Message(coverage, masterCoverage, coverageResult);
+        final Message message = new Message(testCoverageValue, masterCoverageValue, coverageResult);
         buildLog.println(BUILD_LOG_PREFIX + message.forBuild());
         ReportCoverageAction coverageAction = new ReportCoverageAction(message.forBuild());
         build.addAction(coverageAction);
@@ -228,8 +254,24 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
             publishComment(message, buildUrl, jenkinsUrl, settingsRepository, gitHubRepository, prId, listener);
         } else {
             buildLog.println(BUILD_LOG_PREFIX + "publishing result as status check");
-            publishStatusCheck(message, gitHubRepository, prId, masterCoverage, coverage, buildUrl, listener);
+            publishStatusCheck(message, gitHubRepository, prId, masterCoverageValue, testCoverageValue, buildUrl, listener);
         }
+    }
+
+    private List<String> getCoverageFilters(List<String> changedFiles) {
+        ArrayList<String> result = new ArrayList<>();
+
+        List<String> excludeFiles = CompareCoverageConfiguration.get().getExcludeFiles();
+        if (excludeFiles != null){
+            result.addAll(excludeFiles);
+        }
+        if (changedFiles !=null){
+            if (changedFiles.stream().noneMatch(x -> x.endsWith(".go"))){
+                result.add(".go");
+            }
+        }
+        return result;
+
     }
 
     private void publishComment(
@@ -314,32 +356,8 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
-    private static Map<String, String> getCoverageDetails(FilePath dev, FilePath test, PrintStream log, List<String> excludeFiles) throws IOException, InterruptedException {
+    private static Map<String, String> getCoverageDetails(Map<String,Coverage> coverageDev, Map<String,Coverage> coverageTest, PrintStream log) {
         Map<String, String> coverageDetails = new HashMap<>();
-        if (!dev.exists() || !test.exists()){
-            log.println("Coverage file(s) does not exists. failed to run comparison");
-            log.println("Dev coverage file path: "+ dev);
-            log.println("Test coverage file path: "+ test);
-            if (dev.exists()){
-                log.println("dev file exists");
-            }
-            if (test.exists()){
-                log.println("test file exists");
-            }
-            return coverageDetails;
-        }
-        try {
-            SAXParserFactory factory = SAXParserFactory.newInstance();
-            factory.setValidating(false);
-            factory.setNamespaceAware(true);
-            SAXParser saxParser = factory.newSAXParser();
-            saxParser.getXMLReader().setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            CoberturaHandler handlerDev = new CoberturaHandler();
-            CoberturaHandler handlerTest = new CoberturaHandler();
-            saxParser.parse(dev.read(), handlerDev);
-            Map<String, Coverage> coverageDev = handlerDev.getCoverageDetails();
-            saxParser.parse(test.read(), handlerTest);
-            Map<String, Coverage> coverageTest = handlerTest.getCoverageDetails();
             for (Map.Entry<String, Coverage> entry : coverageTest.entrySet()) {
                 Coverage entryDev = coverageDev.getOrDefault(entry.getKey(),null);
                 if (entryDev != null && !Objects.equals(entryDev.lineRate, entry.getValue().lineRate) && Float.parseFloat(entryDev.lineRate) > Float.parseFloat(entry.getValue().lineRate)){
@@ -360,9 +378,6 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
         return coverageDetails;
     }
 }

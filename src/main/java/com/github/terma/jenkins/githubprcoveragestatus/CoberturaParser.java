@@ -17,6 +17,7 @@ limitations under the License.
 */
 package com.github.terma.jenkins.githubprcoveragestatus;
 
+import hudson.FilePath;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
@@ -68,27 +69,4 @@ class CoberturaParser implements CoverageReportParser {
             throw new RuntimeException(e);
         }
     }
-
-    public Map<String, Coverage> getFull(String coberturaFilePath, List<String> exclude){
-        try {
-            InputStream stream = Files.newInputStream(Paths.get(coberturaFilePath));
-            Map<String, Coverage> coverage = CoberturaHandler.parse(stream);
-            return coverage.entrySet()
-                    .stream()
-                    .filter(e -> !isExcluded(e.getValue().file, exclude))
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            Map.Entry::getValue
-                    ));
-        }
-        catch (Exception ex){
-            throw new RuntimeException(ex);
-        }
-
-    }
-
-    private boolean isExcluded(String file, List<String> exclude) {
-        return exclude.stream().anyMatch(file::endsWith);
-    }
-
 }
