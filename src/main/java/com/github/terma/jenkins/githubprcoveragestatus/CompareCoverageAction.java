@@ -213,13 +213,16 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
                 // testCoverageValue calculation
                 // calculate delta = prCovered/prTotalAll - masterCovered/masterCoveredTotalAll
                 // calculate testCoverageValue = masterCoverageValue + delta
-
-                float coverageDelta = CoberturaHandler.coverageDelta(coverageOrig, masterCoverageOrig, filters, buildLog);
-                testCoverageValue = masterCoverageValue + coverageDelta;
-                buildLog.println("Master coverage: " + masterCoverageValue);
-                buildLog.println("PR coverage: " + testCoverageValue);
-                buildLog.println("PR coverage delta : " + coverageDelta);
-
+                if (filters.isEmpty()){
+                    testCoverageValue = ServiceRegistry.getCoverageRepository(settingsRepository.isDisableSimpleCov(),
+                            jacocoCoverageCounter).get(null);
+                } else {
+                    float coverageDelta = CoberturaHandler.coverageDelta(coverageOrig, masterCoverageOrig, filters, buildLog);
+                    testCoverageValue = masterCoverageValue + coverageDelta;
+                    buildLog.println("Master coverage: " + masterCoverageValue);
+                    buildLog.println("PR coverage: " + testCoverageValue);
+                    buildLog.println("PR coverage delta : " + coverageDelta);
+                }
                 if (Percent.roundFourAfterDigit(testCoverageValue) < Percent.roundFourAfterDigit(masterCoverageValue)) {
                     try {
                         coverageResult = getCoverageDetails(masterCoverageOrig, coverageOrig, filters, buildLog);
