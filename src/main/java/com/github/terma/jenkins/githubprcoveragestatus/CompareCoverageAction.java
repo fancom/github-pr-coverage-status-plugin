@@ -207,22 +207,15 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
                 List<String> filters = getCoverageFilters(changedFiles);
                 // Get coverage published on master branch (the value set on master CI build)
                 final float masterCoverageFull = masterCoverageRepository.get(gitUrl);
-
                 Map<String, Coverage> masterCoverageOrig = CoberturaHandler.parse(dev);
-                Map<String, Coverage> masterCoverage = CoberturaHandler.filter(masterCoverageOrig, filters);
-
                 buildLog.println(BUILD_LOG_PREFIX + "collecting coverage...");
                 Map<String, Coverage> coverageOrig = CoberturaHandler.parse(test);
-                Map<String, Coverage> coverage = CoberturaHandler.filter(coverageOrig, filters);
-
-
-
                 masterCoverageValue = masterCoverageFull;
                 // testCoverageValue calculation
                 // calculate delta = prCovered/prTotalAll - masterCovered/masterCoveredTotalAll
                 // calculate testCoverageValue = masterCoverageValue + delta
 
-                float coverageDelta = CoberturaHandler.coverageDelta(coverageOrig, coverage, masterCoverageOrig, masterCoverage, buildLog);
+                float coverageDelta = CoberturaHandler.coverageDelta(coverageOrig, masterCoverageOrig, filters, buildLog);
                 testCoverageValue = masterCoverageValue + coverageDelta;
                 buildLog.println("Master coverage: " + masterCoverageValue);
                 buildLog.println("PR coverage: " + testCoverageValue);
@@ -230,7 +223,7 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
 
                 if (Percent.roundFourAfterDigit(testCoverageValue) < Percent.roundFourAfterDigit(masterCoverageValue)) {
                     try {
-                        coverageResult = getCoverageDetails(masterCoverage, coverage, buildLog);
+                        coverageResult = getCoverageDetails(masterCoverageOrig, coverageOrig, filters, buildLog);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -356,7 +349,9 @@ public class CompareCoverageAction extends Recorder implements SimpleBuildStep {
         }
 
     }
-    private static Map<String, String> getCoverageDetails(Map<String,Coverage> coverageDev, Map<String,Coverage> coverageTest, PrintStream log) {
+    private static Map<String, String> getCoverageDetails(Map<String,Coverage> coverageDevOrig, Map<String,Coverage> coverageTestOrig, List<String> filters, PrintStream log) {
+        Map<String,Coverage> coverageDev = CoberturaHandler.filter(coverageDevOrig, filters);
+        Map<String,Coverage> coverageTest = CoberturaHandler.filter(coverageTestOrig, filters);
         Map<String, String> coverageDetails = new HashMap<>();
             for (Map.Entry<String, Coverage> entry : coverageTest.entrySet()) {
                 Coverage entryDev = coverageDev.getOrDefault(entry.getKey(),null);

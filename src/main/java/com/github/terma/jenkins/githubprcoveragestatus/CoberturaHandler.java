@@ -69,7 +69,9 @@ public class CoberturaHandler extends DefaultHandler {
         return (float) coveredLines / totalLines;
     }
 
-    public static float coverageDelta(Map<String, Coverage> coverage, Map<String, Coverage> coverageOrig, Map<String, Coverage> masterCoverage, Map<String, Coverage> masterCoverageOrig, PrintStream log){
+    public static float coverageDelta(Map<String, Coverage> coverageOrig, Map<String, Coverage> masterCoverageOrig, List<String> filters, PrintStream log){
+        Map<String, Coverage> coverage = filter(coverageOrig, filters);
+        Map<String, Coverage> masterCoverage = filter(masterCoverageOrig, filters);
         long totalLinesOrig = coverageOrig.values()
                 .stream()
                 .flatMap(c -> c.lines.values().stream())
