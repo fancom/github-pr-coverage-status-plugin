@@ -74,17 +74,13 @@ public class CoberturaHandler extends DefaultHandler {
         Map<String, Coverage> masterCoverage = filter(masterCoverageOrig, filters);
         long totalLinesOrig = coverageOrig.values()
                 .stream()
-                .flatMap(c -> c.lines.values().stream())
-                .mapToLong(Long::parseLong)
-                .filter(h -> h >= 0)
-                .count();
+                .mapToLong(c -> c.lines.size())
+                .sum();
         log.println("PR total lines: " + totalLinesOrig);
         long totalLinesMasterOrig = masterCoverageOrig.values()
                 .stream()
-                .flatMap(c -> c.lines.values().stream())
-                .mapToLong(Long::parseLong)
-                .filter(h -> h >= 0)
-                .count();
+                .mapToLong(c -> c.lines.size())
+                .sum();
         log.println("Master total lines: " + totalLinesMasterOrig);
         long coveredLines = coverage.values()
                 .stream()
