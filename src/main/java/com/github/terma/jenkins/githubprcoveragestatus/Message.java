@@ -35,9 +35,9 @@ class Message {
 
     private final float coverage;
     private final float masterCoverage;
-    private Map<String, String> coverageResult;
+    private final Map<String, Coverage> coverageResult;
 
-    public Message(float coverage, float masterCoverage, Map<String, String> coverageResult) {
+    public Message(float coverage, float masterCoverage, Map<String, Coverage> coverageResult) {
         this.coverage = Percent.roundFourAfterDigit(coverage);
         this.masterCoverage = Percent.roundFourAfterDigit(masterCoverage);
         this.coverageResult = coverageResult;
@@ -84,8 +84,11 @@ class Message {
                 Percent.toString(Percent.change(coverage, masterCoverage)),
                 Percent.toWholeNoSignString(masterCoverage)));
 
-        for (Map.Entry<String, String> entry : coverageResult.entrySet()) {
-            message.append("<BR/>").append(entry.getKey()).append(": -").append(entry.getValue());
+        for (Map.Entry<String, Coverage> entry : coverageResult.entrySet()) {
+            message.append("<BR/><B>").append(entry.getKey()).append(": -").append(entry.getValue().lineRate).append("</B>");
+            for (Map.Entry<String,String> line: entry.getValue().lines.entrySet()){
+                message.append("<BR/>").append(line.getKey()).append(": ").append(line.getValue());
+            }
         }
         if (masterCoverage > coverage && coverageResult.entrySet().size() ==0){
             message.append("<BR/>").append("Failed to get the coverage reduce reason. Check coverage reports manually");

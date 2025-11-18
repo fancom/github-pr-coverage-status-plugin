@@ -45,7 +45,7 @@ import java.util.Map;
  * @see CompareCoverageAction
  */
 @SuppressWarnings({"unused", "WeakerAccess"})
-public class MasterCoverageAction extends Recorder implements SimpleBuildStep {
+public class  MasterCoverageAction extends Recorder implements SimpleBuildStep {
 
     public static final String DISPLAY_NAME = "Record Master Coverage";
     private static final long serialVersionUID = 1L;
